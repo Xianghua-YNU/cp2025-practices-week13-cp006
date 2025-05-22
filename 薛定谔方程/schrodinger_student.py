@@ -1,148 +1,215 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-傅立叶滤波和平滑 - 道琼斯工业平均指数分析解决方案
+薛定谔方程 - 方势阱能级计算（参考答案）
 
-本模块实现了对道琼斯工业平均指数数据的傅立叶分析和滤波处理。
+本模块实现了一维方势阱中粒子能级的计算方法。
 """
 
-import numpy as np  # 导入数值计算库
-import matplotlib.pyplot as plt  # 导入绘图库
+import numpy as np
+import matplotlib.pyplot as plt
 
-def load_data(filename):
+# 物理常数
+HBAR = 1.0545718e-34  # 约化普朗克常数 (J·s)
+ELECTRON_MASS = 9.1094e-31  # 电子质量 (kg)
+EV_TO_JOULE = 1.6021766208e-19  # 电子伏转换为焦耳的系数
+
+
+def calculate_y_values(E_values, V, w, m):
     """
-    加载道琼斯工业平均指数数据
+    计算方势阱能级方程中的三个函数值
     
     参数:
-        filename (str): 数据文件路径
+        E_values (numpy.ndarray): 能量值数组 (eV)
+        V (float): 势阱高度 (eV)
+        w (float): 势阱宽度 (m)
+        m (float): 粒子质量 (kg)
     
     返回:
-        numpy.ndarray: 指数数组
+        tuple: 包含三个numpy数组 (y1, y2, y3)，分别对应三个函数在给定能量值下的函数值
     """
-    try:
-        return np.loadtxt(filename)  # 从文件加载数据并返回
-    except FileNotFoundError:  # 捕获文件不存在异常
-        print(f"错误: 文件 '{filename}' 未找到，请确保文件路径正确。")
-        raise  # 重新抛出异常，终止程序
-    except Exception as e:  # 捕获其他异常
-        print(f"加载数据时出错: {str(e)}")
-        raise  # 重新抛出异常
+    # 将能量从eV转换为J
+    E_joules = E_values * EV_TO_JOULE
+    V_joule = V * EV_TO_JOULE
+    
+    # 计算参数，避免使用过小的数值
+    # 使用 (w^2 * m) / (2 * hbar^2) 作为一个整体计算
+    factor = (w**2 * m) / (2 * HBAR**2)
+    
+    # 计算三个函数值
+    y1 = np.tan(np.sqrt(factor * E_joules))
+    
+    # 对于y2和y3，需要处理可能的除零错误
+    with np.errstate(divide='ignore', invalid='ignore'):
+        y2 = np.sqrt((V_joule - E_joules) / E_joules)
+        y3 = -np.sqrt(E_joules / (V_joule - E_joules))
+    
+    # 处理无穷大和NaN值
+    y1 = np.where(np.isfinite(y1), y1, np.nan)
+    y2 = np.where(np.isfinite(y2), y2, np.nan)
+    y3 = np.where(np.isfinite(y3), y3, np.nan)
+    
+    return y1, y2, y3
 
-def plot_data(data, title="Dow Jones Industrial Average"):
-    """
-    绘制时间序列数据
-    """
-    fig = plt.figure(figsize=(12, 6))  # 创建图形对象，设置尺寸
-    plt.plot(data, linewidth=1.5, color='#1f77b4')  # 绘制数据线，设置线宽和颜色
-    plt.title(title, fontsize=14)  # 设置标题和字体大小
-    plt.xlabel("Trading Day", fontsize=12)  # 设置x轴标签和字体大小
-    plt.ylabel("Index Value", fontsize=12)  # 设置y轴标签和字体大小
-    plt.grid(True, alpha=0.3, linestyle='--')  # 添加网格线，设置透明度和线型
-    plt.tight_layout()  # 自动调整布局
-    plt.show()  # 显示图形
-    return fig  # 返回图形对象
 
-def fourier_filter(data, keep_fraction=0.1):
+def plot_energy_functions(E_values, y1, y2, y3):
     """
-    执行傅立叶变换并滤波
+    绘制能级方程的三个函数曲线
     
     参数:
-        data (numpy.ndarray): 输入数据数组
-        keep_fraction (float): 保留的傅立叶系数比例
+        E_values (numpy.ndarray): 能量值数组 (eV)
+        y1 (numpy.ndarray): 函数y1的值
+        y2 (numpy.ndarray): 函数y2的值
+        y3 (numpy.ndarray): 函数y3的值
     
     返回:
-        tuple: (滤波后的数据数组, 原始傅立叶系数数组)
+        matplotlib.figure.Figure: 绘制的图形对象
     """
-    # 计算实数信号的傅立叶变换（只计算正频率部分）
-    fft_coeff = np.fft.rfft(data)
+    fig, ax = plt.subplots(figsize=(10, 6))
     
-    # 计算保留的系数数量（基于保留比例）
-    cutoff = int(len(fft_coeff) * keep_fraction)
+    # 绘制三个函数曲线
+    ax.plot(E_values, y1, 'b-', label=r'$y_1 = \tan\sqrt{w^2mE/2\hbar^2}$')
+    ax.plot(E_values, y2, 'r-', label=r'$y_2 = \sqrt{\frac{V-E}{E}}$ (偶宇称)')
+    ax.plot(E_values, y3, 'g-', label=r'$y_3 = -\sqrt{\frac{E}{V-E}}$ (奇宇称)')
     
-    # 创建滤波后的系数数组，复制原始系数
-    filtered_coeff = fft_coeff.copy()
-    filtered_coeff[cutoff:] = 0  # 将截止频率后的系数置为0（低通滤波）
+    # 添加水平和垂直参考线
+    ax.axhline(y=0, color='k', linestyle='--', alpha=0.3)
+    ax.axvline(x=0, color='k', linestyle='--', alpha=0.3)
     
-    # 执行逆傅立叶变换，恢复时域信号
-    filtered_data = np.fft.irfft(filtered_coeff, n=len(data))
+    # 设置坐标轴范围，限制y轴范围以便更清晰地看到交点
+    ax.set_xlim(0, 20)
+    ax.set_ylim(-10, 10)
     
-    return filtered_data, fft_coeff  # 返回滤波后数据和原始傅立叶系数
+    # 添加标签和标题
+    ax.set_xlabel('Energy E (eV)')
+    ax.set_ylabel('Function value')
+    ax.set_title('Square Potential Well Energy Levels')
+    ax.legend()
+    ax.grid(True, alpha=0.3)
+    
+    return fig
 
-def plot_comparison(original, filtered, title="Fourier Filter Result", keep_percentage=None):
-    """
-    绘制原始数据和滤波结果的比较
-    """
-    fig = plt.figure(figsize=(12, 6))  # 创建图形对象
-    # 绘制原始数据，绿色线，线宽1，透明度0.7
-    plt.plot(original, 'g-', linewidth=1, alpha=0.7, label="Original Data")
-    # 绘制滤波后数据，红色线，线宽2
-    plt.plot(filtered, 'r-', linewidth=2, label=f"Filtered ({keep_percentage}% coefficients)")
-    plt.title(title, fontsize=14)  # 设置标题
-    plt.xlabel("Trading Day", fontsize=12)  # 设置x轴标签
-    plt.ylabel("Index Value", fontsize=12)  # 设置y轴标签
-    plt.legend(fontsize=10)  # 显示图例
-    plt.grid(True, alpha=0.3, linestyle='--')  # 添加网格线
-    plt.tight_layout()  # 调整布局
-    plt.show()  # 显示图形
-    return fig  # 返回图形对象
 
-def plot_spectrum(fft_coeff, title="Frequency Spectrum"):
+def energy_equation_even(E, V, w, m):
     """
-    绘制傅立叶系数的频谱图
+    偶宇称能级方程: tan(sqrt(w^2*m*E/(2*hbar^2))) = sqrt((V-E)/E)
+    返回两边的差值，用于求根
     """
-    fig = plt.figure(figsize=(12, 6))  # 创建图形对象
-    # 计算频率值（对应每个傅立叶系数）
-    frequencies = np.fft.rfftfreq(len(fft_coeff) * 2 - 2, d=1)
-    magnitudes = np.abs(fft_coeff)  # 计算系数的幅度（绝对值）
+    E_joule = E * EV_TO_JOULE
+    V_joule = V * EV_TO_JOULE
+    factor = (w**2 * m) / (2 * HBAR**2)
     
-    plt.plot(frequencies, magnitudes, 'b-', linewidth=1.5)  # 绘制频谱图
-    plt.title(title, fontsize=14)  # 设置标题
-    plt.xlabel("Frequency (cycles per day)", fontsize=12)  # 设置x轴标签
-    plt.ylabel("Magnitude", fontsize=12)  # 设置y轴标签
-    plt.grid(True, alpha=0.3, linestyle='--')  # 添加网格线
-    plt.tight_layout()  # 调整布局
-    plt.show()  # 显示图形
-    return fig  # 返回图形对象
+    left = np.tan(np.sqrt(factor * E_joule))
+    right = np.sqrt((V_joule - E_joule) / E_joule)
+    
+    return left - right
 
-def calculate_rmse(original, filtered):
+
+def energy_equation_odd(E, V, w, m):
     """
-    计算原始数据和滤波数据之间的均方根误差
+    奇宇称能级方程: tan(sqrt(w^2*m*E/(2*hbar^2))) = -sqrt(E/(V-E))
+    返回两边的差值，用于求根
     """
-    return np.sqrt(np.mean((original - filtered) ** 2))  # 计算RMSE
+    E_joule = E * EV_TO_JOULE
+    V_joule = V * EV_TO_JOULE
+    factor = (w**2 * m) / (2 * HBAR**2)
+    
+    left = np.tan(np.sqrt(factor * E_joule))
+    right = -np.sqrt(E_joule / (V_joule - E_joule))
+    
+    return left - right
+
+
+def find_energy_level_bisection(n, V, w, m, precision=0.001, E_min=0.001, E_max=None):
+    """
+    使用二分法求解方势阱中的第n个能级
+    
+    参数:
+        n (int): 能级序号 (0表示基态，1表示第一激发态，以此类推)
+        V (float): 势阱高度 (eV)
+        w (float): 势阱宽度 (m)
+        m (float): 粒子质量 (kg)
+        precision (float): 求解精度 (eV)
+        E_min (float): 能量搜索下限 (eV)
+        E_max (float): 能量搜索上限 (eV)，默认为V
+    
+    返回:
+        float: 第n个能级的能量值 (eV)
+    """
+    if E_max is None:
+        E_max = V - 0.001  # 避免在V处的奇点
+    
+    # 根据能级序号n选择合适的方程
+    if n % 2 == 0:  # 偶数能级 (0, 2, 4, ...)
+        equation = lambda E: energy_equation_even(E, V, w, m)
+    else:  # 奇数能级 (1, 3, 5, ...)
+        equation = lambda E: energy_equation_odd(E, V, w, m)
+    
+    # 初始化搜索区间
+    a, b = E_min, E_max
+    
+    # 检查区间端点的函数值符号是否相反
+    fa, fb = equation(a), equation(b)
+    if fa * fb > 0:
+        # 如果端点函数值符号相同，需要调整搜索区间
+        # 这里简化处理，实际应用中可能需要更复杂的策略
+        # 例如，可以在区间内采样多个点，寻找函数值符号变化的区间
+        raise ValueError(f"无法在给定区间 [{a}, {b}] 内找到第 {n} 个能级")
+    
+    # 二分法迭代
+    while (b - a) > precision:
+        c = (a + b) / 2  # 区间中点
+        fc = equation(c)
+        
+        if abs(fc) < 1e-10:  # 如果中点非常接近根
+            return c
+        
+        if fa * fc < 0:  # 如果根在左半区间
+            b = c
+            fb = fc
+        else:  # 如果根在右半区间
+            a = c
+            fa = fc
+    
+    # 返回区间中点作为近似解
+    return (a + b) / 2
+
 
 def main():
-    try:
-        # 任务1：数据加载与可视化
-        data = load_data('dow.txt')  # 加载数据
-        print(f"数据加载成功，共{len(data)}个交易日数据")  # 打印数据信息
-        plot_data(data, "Dow Jones Industrial Average - Original Data")  # 绘制原始数据图
-        
-        # 任务2：傅立叶变换与滤波（保留前10%系数）
-        filtered_10, coeff = fourier_filter(data, 0.1)  # 执行滤波（保留10%系数）
-        rmse_10 = calculate_rmse(data, filtered_10)  # 计算RMSE
-        plot_comparison(data, filtered_10, "Fourier Filter Comparison", 10)  # 绘制对比图
-        plot_spectrum(coeff, "Frequency Spectrum of Original Data")  # 绘制频谱图
-        print(f"保留10%系数的RMSE: {rmse_10:.2f}")  # 打印RMSE值
-        
-        # 任务3：修改滤波参数（保留前2%系数）
-        filtered_2, _ = fourier_filter(data, 0.02)  # 执行滤波（保留2%系数）
-        rmse_2 = calculate_rmse(data, filtered_2)  # 计算RMSE
-        plot_comparison(data, filtered_2, "Fourier Filter Comparison", 2)  # 绘制对比图
-        print(f"保留2%系数的RMSE: {rmse_2:.2f}")  # 打印RMSE值
-        
-        # 任务4：自定义滤波参数（保留前50%系数）
-        filtered_50, _ = fourier_filter(data, 0.5)  # 执行滤波（保留50%系数）
-        rmse_50 = calculate_rmse(data, filtered_50)  # 计算RMSE
-        plot_comparison(data, filtered_50, "Fourier Filter Comparison", 50)  # 绘制对比图
-        print(f"保留50%系数的RMSE: {rmse_50:.2f}")  # 打印RMSE值
-        
-        # 任务5：对数变换后滤波
-        log_data = np.log(data)  # 对数据取自然对数
-        filtered_log, _ = fourier_filter(log_data, 0.1)  # 对对数数据滤波
-        plot_comparison(log_data, filtered_log, "Fourier Filter on Log-transformed Data", 10)  # 绘制对比图
-        
-    except Exception as e:  # 捕获所有异常
-        print(f"程序执行出错: {str(e)}")  # 打印错误信息
+    """
+    主函数，执行方势阱能级的计算和可视化
+    """
+    # 参数设置
+    V = 20.0  # 势阱高度 (eV)
+    w = 1e-9  # 势阱宽度 (m)
+    m = ELECTRON_MASS  # 粒子质量 (kg)
+    
+    # 1. 计算并绘制函数曲线
+    E_values = np.linspace(0.001, 19.999, 1000)  # 能量范围 (eV)
+    y1, y2, y3 = calculate_y_values(E_values, V, w, m)
+    fig = plot_energy_functions(E_values, y1, y2, y3)
+    plt.savefig('energy_functions.png', dpi=300)
+    plt.show()
+    
+    # 2. 使用二分法计算前6个能级
+    energy_levels = []
+    for n in range(6):
+        energy = find_energy_level_bisection(n, V, w, m)
+        energy_levels.append(energy)
+        print(f"能级 {n}: {energy:.3f} eV")
+    
+    # 与参考值比较
+    reference_levels = [0.318, 1.270, 2.851, 5.050, 7.850, 11.215]
+    print("\n参考能级值:")
+    for n, ref in enumerate(reference_levels):
+        print(f"能级 {n}: {ref:.3f} eV")
+    
+    # 计算相对误差
+    print("\n相对误差:")
+    for n, (calc, ref) in enumerate(zip(energy_levels, reference_levels)):
+        rel_error = abs(calc - ref) / ref * 100
+        print(f"能级 {n}: {rel_error:.2f}%")
+
 
 if __name__ == "__main__":
-    main()  # 程序入口点
+    main()
