@@ -57,4 +57,28 @@ def main():
     plot_series(
         dates, data,
         title='Dow Jones Index Original Time Series',
-        filename=os.path.join(save_dir, 'dow_original
+        filename=os.path.join(save_dir, 'dow_original.png')
+    )
+
+    # 3. 傅立叶滤波（保留前10%系数）
+    filtered_10 = fourier_filter(data, 0.1)
+    plot_series(
+        dates, data,
+        title='Fourier Filtered (Retain 10%) vs Original',
+        filename=os.path.join(save_dir, 'dow_filter_10.png'),
+        filtered=filtered_10,
+        filtered_label='Filtered (10% Low Frequency)'
+    )
+
+    # 4. 傅立叶滤波（保留前2%系数）
+    filtered_2 = fourier_filter(data, 0.02)
+    plot_series(
+        dates, data,
+        title='Fourier Filtered (Retain 2%) vs Original',
+        filename=os.path.join(save_dir, 'dow_filter_2.png'),
+        filtered=filtered_2,
+        filtered_label='Filtered (2% Low Frequency)'
+    )
+
+if __name__ == "__main__":
+    main()
