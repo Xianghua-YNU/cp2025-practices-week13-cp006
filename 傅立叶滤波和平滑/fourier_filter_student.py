@@ -1,105 +1,84 @@
-#!/usr/bin/env python3
-# -*- coding: utf-8 -*-
-"""
-傅立叶滤波和平滑 - 道琼斯工业平均指数分析
-
-本模块实现了对道Jones工业平均指数数据的傅立叶分析和滤波处理。
-"""
-
 import numpy as np
+import matplotlib
+matplotlib.use('Agg')
 import matplotlib.pyplot as plt
+from matplotlib.dates import DateFormatter
+import matplotlib.dates as mdates
+from datetime import datetime, timedelta
+import os
 
-def load_data(filename):
-    """
-    加载道Jones工业平均指数数据
-    
-    参数:
-        filename (str): 数据文件路径
-    
-    返回:
-        numpy.ndarray: 指数数组
-    """
-    # TODO: 实现数据加载功能 (约5行代码)
-    # [STUDENT_CODE_HERE]
-    # 提示: 使用np.loadtxt加载数据文件，处理可能的异常
-    
-    raise NotImplementedError("请在 {} 中实现此函数。".format(__file__))
-    
-    return data
+def load_data(filepath):
+    """从文本文件加载一维数据，每行一个数"""
+    with open(filepath, 'r') as f:
+        data = [float(line.strip()) for line in f if line.strip()]
+    return np.array(data)
 
-def plot_data(data, title="Dow Jones Industrial Average"):
-    """
-    绘制时间序列数据
-    
-    参数:
-        data (numpy.ndarray): 输入数据数组
-        title (str): 图表标题
-    
-    返回:
-        None
-    """
-    # TODO: 实现数据可视化 (约10行代码)
-    # [STUDENT_CODE_HERE]
-    # 提示: 使用plt.plot绘制数据，添加适当的标签和标题
-    
-    raise NotImplementedError("请在 {} 中实现此函数。".format(__file__))
+def generate_dates(num_days):
+    """生成从2006年7月1日开始的日期序列"""
+    start_date = datetime(2006, 7, 1)
+    return [start_date + timedelta(days=i) for i in range(num_days)]
 
-def fourier_filter(data, keep_fraction=0.1):
-    """
-    执行傅立叶变换并滤波
-    
-    参数:
-        data (numpy.ndarray): 输入数据数组
-        keep_fraction (float): 保留的傅立叶系数比例
-    
-    返回:
-        tuple: (滤波后的数据数组, 原始傅立叶系数数组)
-    """
-    # TODO: 实现傅立叶滤波功能 (约15行代码)
-    # [STUDENT_CODE_HERE]
-    # 提示: 
-    # 1. 使用np.fft.rfft计算实数傅立叶变换
-    # 2. 根据keep_fraction计算保留的系数数量
-    # 3. 创建滤波后的系数数组
-    # 4. 使用np.fft.irfft计算逆变换
-    
-    raise NotImplementedError("请在 {} 中实现此函数。".format(__file__))
-    
-    return filtered_data, fft_coeff
+def plot_series(dates, data, title, filename, label='Original Data', filtered=None, filtered_label=None):
+    """绘制时间序列图，可选叠加滤波结果"""
+    fig, ax = plt.subplots(figsize=(12, 6))
+    ax.plot(dates, data, 'b-', alpha=0.7, label=label)
+    if filtered is not None:
+        ax.plot(dates, filtered, 'r-', label=filtered_label)
+    ax.set_title(title, fontsize=14)
+    ax.set_xlabel('Date', fontsize=12)
+    ax.set_ylabel('Index Value', fontsize=12)
+    ax.xaxis.set_major_formatter(DateFormatter('%Y-%m'))
+    ax.xaxis.set_major_locator(mdates.MonthLocator(interval=6))
+    ax.grid(True, linestyle='--', alpha=0.6)
+    ax.legend(loc='upper right')
+    plt.savefig(filename, dpi=300, bbox_inches='tight')
+    print(f"Image saved: {filename}")
+    plt.close(fig)
 
-def plot_comparison(original, filtered, title="Fourier Filter Result"):
-    """
-    绘制原始数据和滤波结果的比较
-    
-    参数:
-        original (numpy.ndarray): 原始数据数组
-        filtered (numpy.ndarray): 滤波后的数据数组
-        title (str): 图表标题
-    
-    返回:
-        None
-    """
-    # TODO: 实现数据比较可视化 (约15行代码)
-    # [STUDENT_CODE_HERE]
-    # 提示: 
-    # 1. 使用不同颜色绘制原始和滤波数据
-    # 2. 添加图例、标签和标题
-    # 3. 使用plt.grid添加网格线
-    
-    raise NotImplementedError("请在 {} 中实现此函数。".format(__file__))
+def fourier_filter(data, retention_ratio):
+    """保留前retention_ratio比例的低频系数"""
+    coeff = np.fft.rfft(data)
+    cutoff = int(len(coeff) * retention_ratio)
+    coeff[cutoff:] = 0
+    filtered = np.fft.irfft(coeff, n=len(data))
+    return filtered
 
 def main():
-    # 任务1：数据加载与可视化
-    data = load_data('dow.txt')
-    plot_data(data, "Dow Jones Industrial Average - Original Data")
-    
-    # 任务2：傅立叶变换与滤波（保留前10%系数）
-    filtered_10, coeff = fourier_filter(data, 0.1)
-    plot_comparison(data, filtered_10, "Fourier Filter (Keep Top 10% Coefficients)")
-    
-    # 任务3：修改滤波参数（保留前2%系数）
-    filtered_2, _ = fourier_filter(data, 0.02)
-    plot_comparison(data, filtered_2, "Fourier Filter (Keep Top 2% Coefficients)")
+    # 路径设置
+    data_path = r'C:\Users\31025\OneDrive\桌面\t\dow.txt'
+    save_dir = r'C:\Users\31025\OneDrive\桌面\t'
+    os.makedirs(save_dir, exist_ok=True)
+
+    # 1. 数据加载
+    data = load_data(data_path)
+    dates = generate_dates(len(data))
+
+    # 2. 绘制原始数据
+    plot_series(
+        dates, data,
+        title='Dow Jones Index Original Time Series',
+        filename=os.path.join(save_dir, 'dow_original.png')
+    )
+
+    # 3. 傅立叶滤波（保留前10%系数）
+    filtered_10 = fourier_filter(data, 0.1)
+    plot_series(
+        dates, data,
+        title='Fourier Filtered (Retain 10%) vs Original',
+        filename=os.path.join(save_dir, 'dow_filter_10.png'),
+        filtered=filtered_10,
+        filtered_label='Filtered (10% Low Frequency)'
+    )
+
+    # 4. 傅立叶滤波（保留前2%系数）
+    filtered_2 = fourier_filter(data, 0.02)
+    plot_series(
+        dates, data,
+        title='Fourier Filtered (Retain 2%) vs Original',
+        filename=os.path.join(save_dir, 'dow_filter_2.png'),
+        filtered=filtered_2,
+        filtered_label='Filtered (2% Low Frequency)'
+    )
 
 if __name__ == "__main__":
     main()
